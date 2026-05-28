@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EXPANDING PULSE — 0.01 → ∞</title>
+<style>
+  body { background: #020205; color: #00ffcc; font-family: monospace; margin: 0; overflow: hidden; }
+  canvas { display: block; }
+  #log { position: fixed; bottom: 10px; left: 10px; font-size: 11px; opacity: 0.6; max-width: 400px; }
+  #title { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); font-size: 14px; letter-spacing: 3px; opacity: 0.4; }
+</style>
+</head>
+<body>
+<div id="title">EXPANDING PULSE // 0.01 → ∞</div>
+<canvas id="expand"></canvas>
+<div id="log"></div>
+
+<script>
+const AXIOM = "02880745b847317c4e2424524ec25d0f7a2b84368d184586f45b54af9fcab763";
+const TONES = [396, 417, 528, 639, 741, 852];
+const QD = ["CdSe","InP","CQDs","Perovskite","MXene","Ag₂S"];
+const GRID = 3;
+const TOTAL = GRID * GRID * GRID; // 27
+
+let time = 0;
+let singularity = false;
+const canvas = document.getElementById('expand');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+const cx = canvas.width / 2;
+const cy = canvas.height / 2;
+
+const log = document.getElementById('log');
+function logMsg(m) { log.innerHTML += m + "\n"; log.scrollTop = log.scrollHeight; }
+
+class ExpandNode {
+  constructor(i) {
+    this.x3 = i % GRID;
+    this.y3 = (i / GRID) % GRID;
+    this.z3 = (i / (GRID * GRID)) % GRID;
+    
+    const theta = (this.x3 / GRID) * Math.PI * 2;
+    const phi = (this.y3 / GRID) * Math.PI - Math.PI / 2;
+    
+    this.theta = theta;
+    this.phi = phi;
+    this.qd = QD[i % 6];
+    this.tone = TONES[i % 6];
+    this.phase = (i / TOTAL) * Math.PI * 2;
+    this.trail = [];
+  }
+  
+  update() {
+    // Expand from 0.01 to infinity
+    const scale = 0.01 + time * 0.5; // grows from 0.01 infinitely
+    const r = scale * (100 + this.z3 * 80);
+    
+    const nx = cx + Math.sin(this.phi) * Math.cos(this.theta) * r;
+    const ny = cy + Math.sin(this.phi) * Math.sin(this.theta) * r;
+    
+    this.x = nx;
+    this.y = ny;
+    
+    this.trail.push({x: nx, y: ny});
+    if (this.trail.length > 12) this.trail.shift();
+    
+    // Timing -+ 5 0 0 5
+    const timingIdx = Math.floor((time * 4) % 4);
+    const timing = [-5, 0, 0, 5][timingIdx];
+    this.intensity = Math.sin(this.phase + time * 0.02 * timing) * 
+                      Math.cos(this.phase + time * 0.02 * timing * 0.3);
+  }
+  
+  draw() {
+    // Trail
+    if (this.trail.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(this.trail[0].x, this.trail[0].y);
+      for (let i = 1; i < this.trail.length; i++) {
+        ctx.lineTo(this.trail[i].x, this.trail[i].y);
+      }
+      const hue = 200 - (this.qd.length / 6) * 160;
+      ctx.strokeStyle = `hsla(${hue}, 70%, 50%, 0.1)`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    
+    // Node
+    const size = (3 + Math.abs(this.intensity) * 5) * (singularity ? 2 : 1);
+    const alpha = 0.3 + Math.abs(this.intensity) * 0.7;
+    const hue = 200 - (this.qd.length / 6) * 160;
+    
+    ctx.fillStyle = `hsla(${hue}, 90%, 60%, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pulse ring when intensity high
+    if (Math.abs(this.intensity) > 0.7) {
+      ctx.strokeStyle = `hsla(${hue}, 100%, 70%, ${alpha * 0.3})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, size + 15, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    
+    // Label
+    ctx.fillStyle = 'rgba(0,255,200,0.25)';
+    ctx.font = '7px monospace';
+    ctx.fillText(`${this.qd}`, this.x + size + 4, this.y - 4);
+    ctx.fillText(`${this.tone}Hz`, this.x + size + 4, this.y + 4);
+  }
+}
+
+const nodes = Array.from({length: TOTAL}, (_,i) => new ExpandNode(i));
+
+// Witness Shield
+function drawShield() {
+  ctx.save();
+  ctx.translate(cx, cy);
+  const layers = [
+    {r:180, c:'#ff4444', l:'OUTER_R'},
+    {r:140, c:'#ff8800', l:'INNER_R'},
+    {r:100, c:'#00ffcc', l:'WITNESS'},
+    {r:60,  c:'#ff8800', l:'INNER_L'},
+    {r:20,  c:'#ff4444', l:'OUTER_L'}
+  ];
+  for (let l of layers) {
+    ctx.beginPath(); ctx.arc(0, 0, l.r * (0.01 + time * 0.5), 0, Math.PI*2);
+    ctx.strokeStyle = singularity ? l.c : l.c + '44';
+    ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Timing display
+function drawTiming() {
+  const idx = Math.floor((time * 4) % 4);
+  const phases = [-5, 0, 0, 5];
+  
+  ctx.fillStyle = 'rgba(0,255,200,0.5)';
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`PHASE: ${phases[idx]}`, cx, 30);
+  ctx.textAlign = 'left';
+  
+  for (let i = 0; i < 4; i++) {
+    const x = 20 + i * 90;
+    const y = canvas.height - 25;
+    ctx.fillStyle = i === idx ? '#ff00ff' : 'rgba(0,255,200,0.2)';
+    ctx.font = '12px monospace';
+    ctx.fillText(phases[i], x, y);
+  }
+}
+
+// Scale display
+function drawScale() {
+  const scale = (0.01 + time * 0.5).toFixed(3);
+  ctx.fillStyle = 'rgba(0,255,200,0.4)';
+  ctx.font = '11px monospace';
+  ctx.fillText(`SCALE: ${scale} → ∞`, 10, canvas.height - 10);
+}
+
+// Main loop
+function draw() {
+  ctx.fillStyle = 'rgba(2,2,5,0.08)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  drawShield();
+  drawTiming();
+  drawScale();
+  
+  nodes.forEach(n => { n.update(); n.draw(); });
+  
+  time += 0.016;
+  requestAnimationFrame(draw);
+}
+
+// Controls
+document.addEventListener('keydown', e => {
+  if (e.key === ' ') {
+    singularity = !singularity;
+    logMsg(singularity ? "⚡ SINGULARITY: Gap→Axiom (0Hz→1Hz)" : "🔄 NORMAL MODE");
+    logMsg("🌀 EXPANDING PULSE: 0.01 → ∞");
+    logMsg("🔁 TIMING: -+ 5 0 0 5");
+  }
+});
+
+// Init
+logMsg("🌀 EXPANDING PULSE v1");
+logMsg("📐 0.01 → ∞");
+logMsg("🔁 Timing: -+ 5 0 0 5");
+logMsg("─ Press SPACE for Singularity Mode ─");
+
+draw();
+</script>
+</body>
+</html>

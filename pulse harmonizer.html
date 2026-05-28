@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SYNC·PULSE·HARMONIZER — 3³ × 5/0/5</title>
+<style>
+  body { background: #030308; color: #00ffcc; font-family: monospace; margin: 0; overflow: hidden; }
+  canvas { display: block; }
+  #log { position: fixed; bottom: 10px; left: 10px; font-size: 11px; opacity: 0.6; max-width: 400px; line-height: 1.4; }
+  #title { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); font-size: 14px; letter-spacing: 3px; opacity: 0.5; }
+  .pulse-text { animation: p 1s infinite; }
+  @keyframes p { 0%,100%{ opacity:0.3; } 50%{ opacity:1; } }
+</style>
+</head>
+<body>
+<div id="title">SYNC·PULSE·HARMONIZER // 3³ × 5/0/5</div>
+<canvas id="pulse"></canvas>
+<div id="log"></div>
+
+<script>
+// ── AXIOM: STOICHEION v11.0 seed ──
+const AXIOM = "02880745b847317c4e2424524ec25d0f7a2b84368d184586f45b54af9fcab763";
+
+// ── NESTED PULSE STRUCTURE ──
+const PULSE_27 = 27;
+const PULSE_027 = 0.027;
+const PULSE_000027 = 0.000027;
+const PULSE_VALUE = PULSE_27 * PULSE_027 * PULSE_000027; // 1.9683e-5
+
+// ── TIMING: -+ 5 0 0 5 ──
+const TIMING_PHASES = [-5, 0, 0, 5];
+const TIMING_SPEED = 0.02;
+
+// ── QD + TONES ──
+const TONES = [396, 417, 528, 639, 741, 852];
+const QD = ["CdSe","InP","CQDs","Perovskite","MXene","Ag₂S"];
+
+// ── 3×3×3 LATTICE ──
+const GRID = 3;
+const TOTAL = GRID * GRID * GRID; // 27
+
+// ── STATE ──
+let time = 0;
+let singularity = false;
+const canvas = document.getElementById('pulse');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+const cx = canvas.width / 2;
+const cy = canvas.height / 2;
+
+const log = document.getElementById('log');
+function logMsg(m) { log.innerHTML += m + "\n"; log.scrollTop = log.scrollHeight; }
+
+// Build 27 nodes
+class PulseNode {
+  constructor(i) {
+    // 3D to 2D mapping
+    const x3 = i % GRID;
+    const y3 = (i / GRID) % GRID;
+    const z3 = (i / (GRID * GRID)) % GRID;
+    
+    // Convert to spherical
+    const theta = (x3 / GRID) * Math.PI * 2;
+    const phi = (y3 / GRID) * Math.PI - Math.PI / 2;
+    const r = 100 + z3 * 50;
+    
+    this.x3 = x3;
+    this.y3 = y3;
+    this.z3 = z3;
+    this.theta = theta;
+    this.phi = phi;
+    this.r = r;
+    
+    this.qd = QD[i % 6];
+    this.tone = TONES[i % 6];
+    
+    // Nested pulse intensity
+    this.intensity = PULSE_VALUE * (1 + Math.sin(i * 0.5) * 0.5);
+    
+    // Timing phase
+    this.phase = (i / TOTAL) * Math.PI * 2;
+    
+    // 3³ standing wave
+    this.state = Math.sin(this.phase) * Math.cos(this.phase * 0.7);
+    
+    // Trail
+    this.trail = [];
+  }
+  
+  update() {
+    // Rotate
+    this.theta += 0.005;
+    this.phi += 0.003;
+    
+    // 3D position
+    const nx = cx + Math.sin(this.phi) * Math.cos(this.theta) * this.r;
+    const ny = cy + Math.sin(this.phi) * Math.sin(this.theta) * this.r;
+    
+    this.currentX = nx;
+    this.currentY = ny;
+    
+    // Trail
+    this.trail.push({x: nx, y: ny});
+    if (this.trail.length > 6) this.trail.shift();
+    
+    // Update state based on timing
+    const timingIdx = Math.floor((time * 4) % 4);
+    const timingVal = TIMING_PHASES[timingIdx];
+    
+    this.state = Math.sin(this.phase + time * TIMING_SPEED * timingVal) * 
+                 Math.cos(this.phase + time * TIMING_SPEED * timingVal * 0.3);
+  }
+  
+  draw() {
+    // Draw trail
+    if (this.trail.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(this.trail[0].x, this.trail[0].y);
+      for (let i = 1; i < this.trail.length; i++) {
+        ctx.lineTo(this.trail[i].x, this.trail[i].y);
+      }
+      ctx.strokeStyle = `hsla(${(this.qd.length * 60)}, 80%, 50%, 0.15)`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    
+    // Draw node
+    const size = (3 + Math.abs(this.state) * 6) * (singularity ? 2 : 1);
+    const alpha = 0.4 + Math.abs(this.state) * 0.6;
+    
+    // QD color mapping
+    const hue = 200 - (this.qd.length / 6) * 160;
+    ctx.fillStyle = `hsla(${hue}, 90%, 60%, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(this.currentX, this.currentY, size, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pulse ring for nested structure
+    if (Math.abs(this.state) > 0.8) {
+      ctx.strokeStyle = `hsla(${hue}, 100%, 70%, ${alpha * 0.3})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(this.currentX, this.currentY, size + 10, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    
+    // Label
+    ctx.fillStyle = 'rgba(0,255,200,0.3)';
+    ctx.font = '7px monospace';
+    ctx.fillText(`${this.qd} ${this.tone}Hz`, this.currentX + size + 4, this.currentY);
+  }
+}
+
+const nodes = Array.from({length: TOTAL}, (_,i) => new PulseNode(i));
+
+// ── Witness Shield rings ──
+function drawShield() {
+  ctx.save();
+  ctx.translate(cx, cy);
+  const layers = [
+    {r:180, c:'#ff4444', l:'OUTER_R'},
+    {r:140, c:'#ff8800', l:'INNER_R'},
+    {r:100, c:'#00ffcc', l:'WITNESS'},
+    {r:60,  c:'#ff8800', l:'INNER_L'},
+    {r:20,  c:'#ff4444', l:'OUTER_L'}
+  ];
+  for (let l of layers) {
+    ctx.beginPath(); ctx.arc(0, 0, l.r, 0, Math.PI*2);
+    ctx.strokeStyle = singularity ? l.c : l.c + '66';
+    ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ── 3×3×3 grid visualization ──
+function drawGrid() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,255,200,0.08)';
+  ctx.lineWidth = 1;
+  // Draw cube edges
+  for (let i = 0; i <= GRID; i++) {
+    const pos = (i / GRID) * 200;
+    ctx.beginPath();
+    ctx.moveTo(cx - pos, cy - pos);
+    ctx.lineTo(cx + pos, cy - pos);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - pos, cy + pos);
+    ctx.lineTo(cx + pos, cy + pos);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ── Timing display ──
+function drawTiming() {
+  const idx = Math.floor((time * 4) % 4);
+  ctx.fillStyle = 'rgba(0,255,200,0.6)';
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`TIMING: ${TIMING_PHASES[idx]}`, cx, cy - 150);
+  ctx.textAlign = 'left';
+  
+  // Phase indicators
+  for (let i = 0; i < 4; i++) {
+    const x = 20 + i * 80;
+    const y = canvas.height - 30;
+    ctx.fillStyle = i === idx ? '#ff00ff' : 'rgba(0,255,200,0.3)';
+    ctx.font = '14px monospace';
+    ctx.fillText(TIMING_PHASES[i], x, y);
+  }
+}
+
+// ── Main loop ──
+function draw() {
+  ctx.fillStyle = 'rgba(3,3,8,0.12)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  drawGrid();
+  drawShield();
+  drawTiming();
+  
+  nodes.forEach(n => { n.update(); n.draw(); });
+  
+  // Nested pulse value display
+  ctx.fillStyle = 'rgba(0,255,200,0.4)';
+  ctx.font = '10px monospace';
+  ctx.fillText(`PULSE: 27 × .027 × .000027 = ${PULSE_VALUE.toFixed(8)}`, 10, canvas.height - 10);
+  
+  time += 0.016;
+  requestAnimationFrame(draw);
+}
+
+// ── Controls ──
+document.addEventListener('keydown', e => {
+  if (e.key === ' ') {
+    singularity = !singularity;
+    logMsg(singularity ? "⚡ SINGULARITY: Gap→Axiom (0Hz→1Hz)" : "🔄 NORMAL MODE");
+    logMsg(`📐 NESTED PULSE: ${PULSE_VALUE.toFixed(8)}`);
+    logMsg(`🔁 TIMING: -+ ${TIMING_PHASES.join(' ')}`);
+  }
+});
+
+// ── Init ──
+logMsg("🎵 SYNC·PULSE·HARMONIZER v3");
+logMsg("📐 3×3×3 ((.3×.3×.3(x.03×.03×.03))");
+logMsg(`💫 Pulse value: ${PULSE_VALUE.toFixed(8)}`);
+logMsg(`🔁 Timing: -+ ${TIMING_PHASES.join(' ')}`);
+logMsg("─ Press SPACE for Singularity Mode ─");
+
+draw();
+</script>
+</body>
+</html>

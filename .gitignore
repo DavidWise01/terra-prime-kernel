@@ -1,0 +1,20 @@
+# Generated databases
+*.db
+*.sqlite
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+# Windows artifacts
+New Text Document.txt
+Thumbs.db
+desktop.ini
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+*.swp
