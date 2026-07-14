@@ -1,0 +1,9 @@
+ROOT0-DLW-CHAIN-v1
+index : 1369
+slug  : terra-prime-kernel
+seal  : 81deefa51353f649e48c7f71e38125f7bec1d6c6898197dfa84d2c2b7579c2f5
+prev  : b520e1fcc47abd520e7c5e08973e2272861cd500b5ede6c2dbaf4989ba3219ef
+link  : 7efb49716b5548af2c1175421268e686f8ed721532280ce667c6bcea55aa4ff9
+head  : 41f029ee4eaa0042c67040dc5927434f8e8446341839c86b6a09d79c5fbf30da
+
+— the tether: link = sha256(index|slug|seal|prev). the chain head commits to the whole corpus.
